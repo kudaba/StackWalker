@@ -883,16 +883,34 @@ StackWalker::~StackWalker()
     free(m_szSymPath);
   m_szSymPath = NULL;
   if (this->m_sw != NULL)
-    delete this->m_sw;
+  {
+    if (m_freeInternal)
+      delete this->m_sw;
+    else
+      this->m_sw->~StackWalkerInternal();
+  }
   this->m_sw = NULL;
 }
 
-BOOL StackWalker::LoadModules()
+BOOL StackWalker::LoadModules(PVOID lpBuffer, DWORD nSize)
 {
   if (m_modulesLoaded != FALSE)
     return TRUE;
 
-  this->m_sw = new StackWalkerInternal(this, this->m_hProcess);
+  if (lpBuffer)
+  {
+    if (nSize < sizeof(StackWalkerInternal))
+      return FALSE;
+
+    this->m_sw = (StackWalkerInternal*)lpBuffer;
+    new (this->m_sw) StackWalkerInternal(this, this->m_hProcess);
+    m_freeInternal = false;
+  }
+  else
+  {
+    this->m_sw = new StackWalkerInternal(this, this->m_hProcess);
+    m_freeInternal = true;
+  }
 
   if (this->m_sw == NULL)
   {
